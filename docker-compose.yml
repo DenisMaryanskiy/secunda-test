@@ -54,6 +54,34 @@ services:
         condition: service_healthy
     restart: "no"
 
+  api:
+    build: .
+    command:
+      - uvicorn
+      - payment_service.api.app:create_app
+      - --factory
+      - --host=0.0.0.0
+      - --port=8000
+      # Свой dictConfig уже настроен в configure_logging, иначе uvicorn перебьёт его своим.
+      - --no-access-log
+    environment: *app-env
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      migrator:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request as r; r.urlopen("http://localhost:8000/health")
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
 volumes:
   postgres-data:
   rabbitmq-data:

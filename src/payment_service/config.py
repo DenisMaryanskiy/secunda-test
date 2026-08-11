@@ -20,8 +20,13 @@ class DatabaseSettings(BaseModel):
 
 class BrokerSettings(BaseModel):
     url: AmqpDsn
+
+
+class ConsumerSettings(BaseModel):
     prefetch_count: int = Field(default=10, ge=1)
+    # Попыток на сообщение всего; после последней оно уезжает в DLQ.
     max_attempts: int = Field(default=3, ge=1)
+    # Задержка перед повтором: base * 2^(attempt-1).
     retry_base_delay_seconds: float = Field(default=2.0, gt=0)
 
 
@@ -45,7 +50,6 @@ class WebhookSettings(BaseModel):
     timeout_seconds: float = Field(default=5.0, gt=0)
     max_attempts: int = Field(default=3, ge=1)
     retry_base_delay_seconds: float = Field(default=0.5, gt=0)
-    max_response_bytes: int = Field(default=64 * 1024, ge=0)
     allow_insecure_targets: bool = Field(
         default=False,
         description="Разрешить http и приватные адреса. Только для локальной разработки.",
@@ -73,6 +77,7 @@ class Settings(BaseSettings):
 
     database: DatabaseSettings
     broker: BrokerSettings
+    consumer: ConsumerSettings = ConsumerSettings()
     gateway: GatewaySettings = GatewaySettings()
     webhook: WebhookSettings
     outbox: OutboxSettings = OutboxSettings()

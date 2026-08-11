@@ -74,7 +74,8 @@ ban-relative-imports = "all"
 
 [tool.mypy]
 python_version = "3.13"
-files = ["src", "tests"]
+files = ["src/payment_service", "tests"]
+mypy_path = "src"
 strict = true
 plugins = ["pydantic.mypy"]
 

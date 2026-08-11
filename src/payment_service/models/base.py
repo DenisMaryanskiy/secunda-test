@@ -1,6 +1,6 @@
 import enum
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import DateTime, Enum, MetaData, func
@@ -42,5 +42,13 @@ class UUIDPrimaryKeyMixin:
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4, sort_order=-100)
 
 
+def utcnow() -> datetime:
+    return datetime.now(UTC)
+
+
 class CreatedAtMixin:
-    created_at: Mapped[datetime] = mapped_column(server_default=func.now(), sort_order=-99)
+    created_at: Mapped[datetime] = mapped_column(
+        server_default=func.now(),
+        default=utcnow,
+        sort_order=-99,
+    )

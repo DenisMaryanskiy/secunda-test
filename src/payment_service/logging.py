@@ -14,24 +14,28 @@ MAX_REDACTION_DEPTH = 4
 SENSITIVE_KEYS = frozenset(
     {
         "api_key",
-        "apikey",
         "authorization",
         "password",
         "secret",
         "signature",
         "signing_secret",
         "token",
-        "x-api-key",
-        "x-payment-signature",
+        "x_api_key",
+        "x_payment_signature",
     }
 )
+
+
+def _is_sensitive(key: object) -> bool:
+    # Дефисы к подчёркиваниям: имена заголовков и полей пишут и так, и так.
+    return str(key).lower().replace("-", "_") in SENSITIVE_KEYS
 
 
 def _redact(value: Any, depth: int = 0) -> Any:
     if depth >= MAX_REDACTION_DEPTH or not isinstance(value, MutableMapping):
         return value
     return {
-        key: REDACTED if str(key).lower() in SENSITIVE_KEYS else _redact(item, depth + 1)
+        key: REDACTED if _is_sensitive(key) else _redact(item, depth + 1)
         for key, item in value.items()
     }
 
