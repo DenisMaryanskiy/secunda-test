@@ -1,4 +1,4 @@
-FROM ghcr.io/astral-sh/uv:0.9.27-python3.13-bookworm-slim
+FROM ghcr.io/astral-sh/uv:0.9.30-python3.13-bookworm-slim
 
 ENV UV_COMPILE_BYTECODE=1 \
     UV_NO_CACHE=1 \
