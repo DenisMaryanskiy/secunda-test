@@ -1,0 +1,11 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Задокументированные заглушки для локального запуска, не рабочие учётные данные."
+regexTarget = "match"
+regexes = [
+  # Дефолты из .env.example и docker-compose.yml: local-dev-key для X-API-Key
+  # и local-dev-webhook-secret для подписи. Оба живут только на localhost.
+  '''local-dev-[a-z-]+''',
+]
