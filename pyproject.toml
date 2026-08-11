@@ -59,7 +59,10 @@ select = [
     "ASYNC",
 ]
 ignore = [
-    "B008",   # Depends() в аргументах по умолчанию - идиома FastAPI
+    "B008",              # Depends() в аргументах по умолчанию - идиома FastAPI
+    "RUF001",            # комментарии и docstring'и на русском, кириллица
+    "RUF002",            # в них не "ambiguous unicode", а нормальный текст
+    "RUF003",
 ]
 
 [tool.ruff.lint.per-file-ignores]
