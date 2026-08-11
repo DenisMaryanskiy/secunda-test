@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Токену по умолчанию хватает чтения: ничего публиковать джобы не должны.
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  UV_VERSION: "0.9.27"
+
+jobs:
+  lint:
+    name: Стиль и типы
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v9
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv sync --locked --all-groups
+      - run: make lint
+      - run: make typecheck
+
+  test:
+    name: Тесты
+    # Интеграционные поднимают Postgres и RabbitMQ через testcontainers,
+    # на docker-демоне раннера. Порог покрытия зашит в pyproject.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v9
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - run: uv sync --locked --all-groups
+      - run: make test
+
+  secrets:
+    name: Поиск секретов
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v3
+        env:
+          # Для репозиториев организаций нужна еще бесплатная лицензия GITLEAKS_LICENSE.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  audit:
+    name: Уязвимости в зависимостях
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v9
+        with:
+          version: ${{ env.UV_VERSION }}
+      - run: make audit
+
+  image:
+    name: Уязвимости в образе
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: docker build -t payment-service:ci .
+      # --ignore-unfixed: падать имеет смысл на том, что можно починить обновлением.
+      - run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:0.69.0 image \
+              --scanners vuln \
+              --severity HIGH,CRITICAL \
+              --ignore-unfixed \
+              --exit-code 1 \
+              payment-service:ci
