@@ -82,6 +82,26 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  # Приёмник вебхуков для локального демо: печатает в лог заголовки и тело,
+  # так что видно и подпись X-Payment-Signature. В проде его, разумеется, нет.
+  webhook-sink:
+    image: mendhak/http-https-echo:37
+    environment:
+      HTTP_PORT: "8080"
+    ports:
+      - "${WEBHOOK_SINK_PORT:-8080}:8080"
+
+  consumer:
+    build: .
+    command: python -m payment_service.messaging.consumer
+    environment: *app-env
+    depends_on:
+      migrator:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
   outbox-publisher:
     build: .
     command: python -m payment_service.outbox.relay

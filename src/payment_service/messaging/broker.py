@@ -1,5 +1,7 @@
+import logging
+
 import structlog
-from faststream.rabbit import RabbitBroker
+from faststream.rabbit import Channel, RabbitBroker
 
 from payment_service.config import BrokerSettings, ConsumerSettings
 from payment_service.messaging.topology import (
@@ -16,7 +18,15 @@ log = structlog.get_logger(__name__)
 
 
 def create_broker(settings: BrokerSettings) -> RabbitBroker:
-    return RabbitBroker(str(settings.url), graceful_timeout=10.0)
+    return RabbitBroker(
+        str(settings.url),
+        graceful_timeout=10.0,
+        logger=logging.getLogger("payment_service.faststream"),
+        # По умолчанию немаршрутизируемое сообщение брокер молча возвращает
+        # через Basic.Return, и publish завершается успешно, событие теряется.
+        # С on_return_raises оно превращается в исключение.
+        default_channel=Channel(publisher_confirms=True, on_return_raises=True),
+    )
 
 
 async def declare_topology(broker: RabbitBroker, settings: ConsumerSettings) -> None:

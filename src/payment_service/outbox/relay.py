@@ -4,11 +4,9 @@ from contextlib import suppress
 
 import structlog
 from faststream.rabbit import RabbitBroker
-from pamqp.commands import Basic
 
 from payment_service.config import OutboxSettings, get_settings
 from payment_service.db import SessionFactory, create_engine, create_session_factory
-from payment_service.errors import EventNotRoutedError
 from payment_service.logging import configure_logging
 from payment_service.messaging.broker import create_broker, declare_topology
 from payment_service.models import OutboxMessage
@@ -63,7 +61,7 @@ class OutboxRelay:
 
     async def _publish(self, message: OutboxMessage, repository: OutboxRepository) -> bool:
         try:
-            confirmation = await self._broker.publish(
+            await self._broker.publish(
                 message.payload,
                 exchange=message.exchange,
                 routing_key=message.routing_key,
@@ -73,14 +71,9 @@ class OutboxRelay:
                 # id записи в outbox: по нему видно дубликат на стороне брокера.
                 message_id=str(message.id),
                 # Без таймаута зависший брокер держал бы открытую транзакцию
-                # с блокировками строк до бесконечности.
+                # с блокировками записей до бесконечности.
                 timeout=self._settings.publish_timeout_seconds,
             )
-            # Немаршрутизируемое сообщение исключения не вызывает: брокер возвращает
-            # его назад через Basic.Return. Без этой проверки событие было бы
-            # помечено опубликованным и потеряно.
-            if not isinstance(confirmation, Basic.Ack):
-                raise EventNotRoutedError(message.exchange, message.routing_key)
         except Exception as exc:
             repository.record_failure(message, f"{type(exc).__name__}: {exc}")
             log.warning(
