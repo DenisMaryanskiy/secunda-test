@@ -17,5 +17,12 @@ class IdempotencyConflictError(PaymentServiceError):
         super().__init__(f"Ключ идемпотентности {idempotency_key} уже использован с другим телом")
 
 
+class EventNotRoutedError(PaymentServiceError):
+    """Брокер принял сообщение, но не нашёл очереди, куда его положить."""
+
+    def __init__(self, exchange: str, routing_key: str) -> None:
+        super().__init__(f"Событие некуда маршрутизировать: {exchange} -> {routing_key}")
+
+
 class UnsafeWebhookUrlError(PaymentServiceError):
     """Адрес webhook ведёт во внутреннюю сеть или использует запрещённую схему."""

@@ -82,6 +82,17 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  outbox-publisher:
+    build: .
+    command: python -m payment_service.outbox.relay
+    environment: *app-env
+    depends_on:
+      migrator:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+
 volumes:
   postgres-data:
   rabbitmq-data:

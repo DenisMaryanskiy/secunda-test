@@ -59,6 +59,7 @@ class WebhookSettings(BaseModel):
 class OutboxSettings(BaseModel):
     poll_interval_seconds: float = Field(default=1.0, gt=0)
     batch_size: int = Field(default=100, ge=1)
+    publish_timeout_seconds: float = Field(default=5.0, gt=0)
 
 
 class Settings(BaseSettings):
