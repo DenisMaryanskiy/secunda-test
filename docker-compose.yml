@@ -1,0 +1,59 @@
+name: secunda-payments
+
+# Значения по умолчанию подобраны так, чтобы `docker compose up` работал без .env.
+x-app-env: &app-env
+  ENVIRONMENT: local
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  LOG_FORMAT: ${LOG_FORMAT:-json}
+  API_KEY: ${API_KEY:-local-dev-key}
+  DATABASE__URL: postgresql+asyncpg://payments:payments@postgres:5432/payments
+  BROKER__URL: amqp://guest:guest@rabbitmq:5672/
+  WEBHOOK__SIGNING_SECRET: ${WEBHOOK__SIGNING_SECRET:-local-dev-webhook-secret}
+  # Внутри compose webhook уходит на соседний контейнер по http и приватному адресу,
+  # поэтому SSRF-guard здесь ослаблен. В production такой конфиг не поднимется.
+  WEBHOOK__ALLOW_INSECURE_TARGETS: "true"
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: payments
+      POSTGRES_PASSWORD: payments
+      POSTGRES_DB: payments
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U payments -d payments"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+      - "${RABBITMQ_UI_PORT:-15672}:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+
+  # Миграции отдельным одноразовым сервисом: приложение не накатывает схему на старте,
+  # иначе три реплики API начнут делать это наперегонки.
+  migrator:
+    build: .
+    command: alembic upgrade head
+    environment: *app-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+volumes:
+  postgres-data:
+  rabbitmq-data:
