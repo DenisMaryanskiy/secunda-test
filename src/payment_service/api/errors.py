@@ -35,7 +35,7 @@ async def _idempotency_conflict(_: Request, exc: IdempotencyConflictError) -> JS
 
 async def _validation_failed(_: Request, exc: RequestValidationError) -> JSONResponse:
     return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         content={
             "code": "validation_error",
             "message": "Тело запроса не прошло валидацию",

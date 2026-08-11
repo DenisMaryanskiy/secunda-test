@@ -10,9 +10,11 @@ from payment_service.models import Base
 
 config = context.config
 
-# URL берём из настроек приложения, чтобы не держать его в двух местах.
-# Знак процента для ConfigParser нужно экранировать, т.к. он встречается в urlencoded паролях.
-config.set_main_option("sqlalchemy.url", str(get_settings().database.url).replace("%", "%%"))
+# По умолчанию URL берём из настроек приложения, чтобы не держать его в двух местах.
+# Уже заданный не трогаем: так тесты подставляют адрес поднятого контейнера.
+# Знак процента для ConfigParser экранируем, т.к. он встречается в urlencoded паролях.
+if not config.get_main_option("sqlalchemy.url", None):
+    config.set_main_option("sqlalchemy.url", str(get_settings().database.url).replace("%", "%%"))
 
 target_metadata = Base.metadata
 

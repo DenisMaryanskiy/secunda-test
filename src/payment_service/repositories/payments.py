@@ -1,11 +1,27 @@
 import uuid
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from payment_service.db import SessionFactory
 from payment_service.enums import PaymentStatus
 from payment_service.models import Payment
 from payment_service.models.base import utcnow
+from payment_service.services.processing import PaymentsTransaction
+
+
+def payments_transaction(session_factory: SessionFactory) -> PaymentsTransaction:
+    """Связывает репозиторий с короткой транзакцией: сессия открывается на одну операцию."""
+
+    @asynccontextmanager
+    async def transaction() -> AsyncIterator[PaymentRepository]:
+        async with session_factory() as session:
+            yield PaymentRepository(session)
+            await session.commit()
+
+    return transaction
 
 
 class PaymentRepository:

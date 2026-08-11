@@ -11,6 +11,7 @@ from payment_service.messaging.broker import create_broker, declare_topology
 from payment_service.messaging.events import PaymentCreatedEvent
 from payment_service.messaging.retry import RetryMiddleware
 from payment_service.messaging.topology import payment_created_queue, payments_exchange
+from payment_service.repositories.payments import payments_transaction
 from payment_service.services.gateway import EmulatedPaymentGateway
 from payment_service.services.processing import PaymentProcessor
 from payment_service.services.webhooks import HttpWebhookNotifier, create_webhook_client
@@ -28,7 +29,7 @@ def create_app(settings: Settings | None = None) -> FastStream:
     engine = create_engine(settings.database)
     webhook_client = create_webhook_client(settings.webhook)
     processor = PaymentProcessor(
-        create_session_factory(engine),
+        payments_transaction(create_session_factory(engine)),
         EmulatedPaymentGateway(settings.gateway),
         HttpWebhookNotifier(webhook_client, settings.webhook),
     )

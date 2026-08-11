@@ -22,6 +22,7 @@ dev = [
     "pre-commit>=4.4.0",
     "pytest>=9.1.1",
     "pytest-asyncio>=1.4.0",
+    "pytest-cov>=7.1.0",
     "ruff>=0.16.2",
     "testcontainers[postgres,rabbitmq]>=4.15.0",
 ]
@@ -87,6 +88,24 @@ ignore_missing_imports = true
 testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
+addopts = "--cov=payment_service --cov-report=term-missing"
 markers = [
     "integration: требует Docker (Postgres + RabbitMQ через testcontainers)",
+]
+
+[tool.coverage.run]
+concurrency = ["thread", "greenlet"]
+
+omit = [
+    # Точка входа: только собирает объекты и запускает цикл. Проверяется тем,
+    # что стек поднимается в docker compose, а сам relay покрыт тестами.
+    "*/outbox/__main__.py",
+]
+
+[tool.coverage.report]
+fail_under = 90
+exclude_also = [
+    "if __name__ == .__main__.:",
+    "^\\s*\\.\\.\\.$",
+    "if TYPE_CHECKING:",
 ]

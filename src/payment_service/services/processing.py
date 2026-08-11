@@ -1,17 +1,34 @@
 import uuid
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from collections.abc import Callable
+from contextlib import AbstractAsyncContextManager
+from typing import Protocol
 
 import structlog
 
-from payment_service.db import SessionFactory
 from payment_service.enums import PaymentStatus
 from payment_service.models import Payment
-from payment_service.repositories.payments import PaymentRepository
 from payment_service.services.gateway import ChargeResult, PaymentGateway
 from payment_service.services.webhooks import WebhookNotifier
 
 log = structlog.get_logger(__name__)
+
+
+class PaymentStore(Protocol):
+    async def get(self, payment_id: uuid.UUID) -> Payment | None: ...
+
+    async def finish_processing(
+        self,
+        payment_id: uuid.UUID,
+        *,
+        status: PaymentStatus,
+        failure_reason: str | None,
+    ) -> Payment | None: ...
+
+    async def mark_webhook_delivered(self, payment_id: uuid.UUID) -> None: ...
+
+
+# Каждый вызов открывает свою короткую транзакцию и закрывает её на выходе.
+type PaymentsTransaction = Callable[[], AbstractAsyncContextManager[PaymentStore]]
 
 
 class PaymentProcessor:
@@ -23,18 +40,18 @@ class PaymentProcessor:
     доставленного. Оба шага идемпотентны по отдельности, потому что упасть можно
     между ними.
 
-    Каждое обращение к БД - отдельная короткая транзакция. Одну открытую на весь
-    сценарий держать нельзя: поход в шлюз занимает секунды, и всё это время
-    соединение висело бы в состоянии idle in transaction.
+    Транзакция открывается на каждое обращение к БД отдельно. Одну на весь сценарий
+    держать нельзя: поход в шлюз занимает секунды, и всё это время соединение
+    висело бы в состоянии idle in transaction.
     """
 
     def __init__(
         self,
-        session_factory: SessionFactory,
+        payments: PaymentsTransaction,
         gateway: PaymentGateway,
         notifier: WebhookNotifier,
     ) -> None:
-        self._session_factory = session_factory
+        self._payments = payments
         self._gateway = gateway
         self._notifier = notifier
 
@@ -59,13 +76,6 @@ class PaymentProcessor:
 
         await self._notifier.notify(payment)
         await self._mark_webhook_delivered(payment_id)
-
-    @asynccontextmanager
-    async def _payments(self) -> AsyncIterator[PaymentRepository]:
-        """Репозиторий в своей короткой транзакции: он привязан к сессии, общей быть не может."""
-        async with self._session_factory() as session:
-            yield PaymentRepository(session)
-            await session.commit()
 
     async def _load(self, payment_id: uuid.UUID) -> Payment | None:
         async with self._payments() as payments:

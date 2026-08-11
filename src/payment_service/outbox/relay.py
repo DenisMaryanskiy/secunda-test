@@ -1,18 +1,26 @@
 import asyncio
-import signal
-from contextlib import suppress
+from collections.abc import Callable, Sequence
+from contextlib import AbstractAsyncContextManager, suppress
+from typing import Protocol
 
 import structlog
 from faststream.rabbit import RabbitBroker
 
-from payment_service.config import OutboxSettings, get_settings
-from payment_service.db import SessionFactory, create_engine, create_session_factory
-from payment_service.logging import configure_logging
-from payment_service.messaging.broker import create_broker, declare_topology
+from payment_service.config import OutboxSettings
 from payment_service.models import OutboxMessage
-from payment_service.repositories.outbox import OutboxRepository
 
-log = structlog.get_logger("payment_service.outbox.relay")
+log = structlog.get_logger(__name__)
+
+
+class OutboxStore(Protocol):
+    async def fetch_unpublished(self, limit: int) -> Sequence[OutboxMessage]: ...
+
+    def mark_published(self, message: OutboxMessage) -> None: ...
+
+    def record_failure(self, message: OutboxMessage, error: str) -> None: ...
+
+
+type OutboxTransaction = Callable[[], AbstractAsyncContextManager[OutboxStore]]
 
 
 class OutboxRelay:
@@ -27,39 +35,37 @@ class OutboxRelay:
     def __init__(
         self,
         broker: RabbitBroker,
-        session_factory: SessionFactory,
+        outbox: OutboxTransaction,
         settings: OutboxSettings,
     ) -> None:
         self._broker = broker
-        self._session_factory = session_factory
+        self._outbox = outbox
         self._settings = settings
 
     async def run(self, stop: asyncio.Event) -> None:
         while not stop.is_set():
-            published = await self._publish_batch()
+            published = await self.publish_batch()
             # Пачка заполнилась целиком, скорее всего есть ещё, идём за следующей
             # без паузы. В остальных случаях, включая полностью неудачную пачку, ждём.
             if published < self._settings.batch_size:
                 with suppress(TimeoutError):
                     await asyncio.wait_for(stop.wait(), self._settings.poll_interval_seconds)
 
-    async def _publish_batch(self) -> int:
+    async def publish_batch(self) -> int:
         published = 0
-        async with self._session_factory() as session:
-            repository = OutboxRepository(session)
-            try:
-                messages = await repository.fetch_unpublished(self._settings.batch_size)
+        try:
+            # Выход из транзакции коммитит отметки; исключение внутри - откатывает.
+            async with self._outbox() as outbox:
+                messages = await outbox.fetch_unpublished(self._settings.batch_size)
                 for message in messages:
-                    if await self._publish(message, repository):
+                    if await self._publish(message, outbox):
                         published += 1
-                await session.commit()
-            except Exception:
-                await session.rollback()
-                log.exception("outbox.batch_failed")
-                return 0
+        except Exception:
+            log.exception("outbox.batch_failed")
+            return 0
         return published
 
-    async def _publish(self, message: OutboxMessage, repository: OutboxRepository) -> bool:
+    async def _publish(self, message: OutboxMessage, outbox: OutboxStore) -> bool:
         try:
             await self._broker.publish(
                 message.payload,
@@ -75,7 +81,7 @@ class OutboxRelay:
                 timeout=self._settings.publish_timeout_seconds,
             )
         except Exception as exc:
-            repository.record_failure(message, f"{type(exc).__name__}: {exc}")
+            outbox.record_failure(message, f"{type(exc).__name__}: {exc}")
             log.warning(
                 "outbox.publish_failed",
                 event_id=str(message.id),
@@ -85,36 +91,6 @@ class OutboxRelay:
             )
             return False
 
-        repository.mark_published(message)
+        outbox.mark_published(message)
         log.info("outbox.published", event_id=str(message.id), event_type=message.event_type)
         return True
-
-
-async def main() -> None:
-    settings = get_settings()
-    configure_logging(settings)
-
-    engine = create_engine(settings.database)
-    broker = create_broker(settings.broker)
-
-    stop = asyncio.Event()
-    loop = asyncio.get_running_loop()
-    for sig in (signal.SIGINT, signal.SIGTERM):
-        loop.add_signal_handler(sig, stop.set)
-
-    await broker.connect()
-    try:
-        await declare_topology(broker, settings.consumer)
-        relay = OutboxRelay(broker, create_session_factory(engine), settings.outbox)
-        log.info("relay.started", poll_interval=settings.outbox.poll_interval_seconds)
-        try:
-            await relay.run(stop)
-        finally:
-            log.info("relay.stopping")
-    finally:
-        await broker.stop()
-        await engine.dispose()
-
-
-if __name__ == "__main__":
-    asyncio.run(main())

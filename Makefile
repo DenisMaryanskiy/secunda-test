@@ -40,7 +40,7 @@ typecheck: ## Проверить типы
 	uv run mypy
 
 test-unit: ## Быстрые тесты, без Docker
-	uv run pytest -m "not integration"
+	uv run pytest -m "not integration" --no-cov
 
 test: ## Все тесты, включая интеграционные на testcontainers
 	uv run pytest

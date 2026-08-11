@@ -104,7 +104,7 @@ services:
 
   outbox-publisher:
     build: .
-    command: python -m payment_service.outbox.relay
+    command: python -m payment_service.outbox
     environment: *app-env
     depends_on:
       migrator:
