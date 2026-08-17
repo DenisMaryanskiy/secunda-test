@@ -18,6 +18,8 @@ from payment_service.errors import UnsafeWebhookUrlError
 SECURE_SCHEMES = frozenset({"https"})
 INSECURE_SCHEMES = frozenset({"http", "https"})
 
+RESOLVE_TIMEOUT_SECONDS = 5.0
+
 
 async def ensure_safe_webhook_target(url: str, *, allow_insecure: bool = False) -> None:
     """
@@ -40,8 +42,11 @@ async def ensure_safe_webhook_target(url: str, *, allow_insecure: bool = False) 
 
     loop = asyncio.get_running_loop()
     try:
-        infos = await loop.getaddrinfo(host, None, type=socket.SOCK_STREAM)
-    except socket.gaierror as exc:
+        infos = await asyncio.wait_for(
+            loop.getaddrinfo(host, None, type=socket.SOCK_STREAM),
+            RESOLVE_TIMEOUT_SECONDS,
+        )
+    except (socket.gaierror, TimeoutError) as exc:
         msg = f"Не удалось разрезолвить хост {host}"
         raise UnsafeWebhookUrlError(msg) from exc
 

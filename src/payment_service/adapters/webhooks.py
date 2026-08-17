@@ -7,11 +7,11 @@ from typing import Protocol
 import httpx
 import structlog
 
+from payment_service.adapters.webhook_url import ensure_safe_webhook_target
 from payment_service.config import WebhookSettings
 from payment_service.errors import WebhookDeliveryError
 from payment_service.models import Payment
 from payment_service.models.base import utcnow
-from payment_service.webhook_url import ensure_safe_webhook_target
 
 log = structlog.get_logger(__name__)
 

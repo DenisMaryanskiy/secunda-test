@@ -10,8 +10,8 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException
 from starlette.types import ExceptionHandler
 
-from payment_service.api.schemas import ErrorResponse
 from payment_service.errors import IdempotencyConflictError, PaymentNotFoundError
+from payment_service.schemas.error import ErrorResponse
 
 log = structlog.get_logger(__name__)
 
@@ -34,12 +34,18 @@ async def _idempotency_conflict(_: Request, exc: IdempotencyConflictError) -> JS
 
 
 async def _validation_failed(_: Request, exc: RequestValidationError) -> JSONResponse:
+    # input и ctx выбрасываем: клиенту хватает поля и причины, а эхо присланного
+    # значения тащит содержимое платёжного запроса в ответ и в логи по пути.
+    details = [
+        {key: value for key, value in error.items() if key not in ("input", "ctx", "url")}
+        for error in exc.errors()
+    ]
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         content={
             "code": "validation_error",
             "message": "Тело запроса не прошло валидацию",
-            "details": jsonable_encoder(exc.errors()),
+            "details": jsonable_encoder(details),
         },
     )
 

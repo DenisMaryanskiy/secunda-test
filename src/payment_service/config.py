@@ -4,6 +4,9 @@ from typing import Literal, Self
 from pydantic import AmqpDsn, BaseModel, Field, PostgresDsn, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Окружения, где публикуется схема API.
+DOCS_ENVIRONMENTS = frozenset({"local"})
+
 
 class DatabaseSettings(BaseModel):
     url: PostgresDsn
@@ -82,6 +85,10 @@ class Settings(BaseSettings):
     gateway: GatewaySettings = GatewaySettings()
     webhook: WebhookSettings
     outbox: OutboxSettings = OutboxSettings()
+
+    @property
+    def docs_enabled(self) -> bool:
+        return self.environment in DOCS_ENVIRONMENTS
 
     @model_validator(mode="after")
     def forbid_insecure_webhooks_in_production(self) -> Self:

@@ -4,6 +4,8 @@ import structlog
 from faststream import AckPolicy, FastStream
 from faststream.rabbit import Channel
 
+from payment_service.adapters.gateway import EmulatedPaymentGateway
+from payment_service.adapters.webhooks import HttpWebhookNotifier, create_webhook_client
 from payment_service.config import Settings, get_settings
 from payment_service.db import create_engine, create_session_factory
 from payment_service.logging import configure_logging
@@ -12,14 +14,12 @@ from payment_service.messaging.events import PaymentCreatedEvent
 from payment_service.messaging.retry import RetryMiddleware
 from payment_service.messaging.topology import payment_created_queue, payments_exchange
 from payment_service.repositories.payments import payments_transaction
-from payment_service.services.gateway import EmulatedPaymentGateway
 from payment_service.services.processing import PaymentProcessor
-from payment_service.services.webhooks import HttpWebhookNotifier, create_webhook_client
 
 log = structlog.get_logger("payment_service.messaging.consumer")
 
 
-def create_app(settings: Settings | None = None) -> FastStream:
+def create_consumer_app(settings: Settings | None = None) -> FastStream:
     settings = settings or get_settings()
     configure_logging(settings)
 
@@ -69,9 +69,3 @@ def create_app(settings: Settings | None = None) -> FastStream:
         log.info("consumer.stopped")
 
     return app
-
-
-if __name__ == "__main__":
-    import asyncio
-
-    asyncio.run(create_app().run())

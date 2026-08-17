@@ -9,11 +9,13 @@ import pytest
 from faststream import AckPolicy, TestApp
 from faststream.rabbit import RabbitBroker
 
+from payment_service.adapters.gateway import ChargeResult
+from payment_service.adapters.webhooks import HttpWebhookNotifier
 from payment_service.config import Settings
 from payment_service.db import SessionFactory
 from payment_service.enums import PaymentStatus
 from payment_service.messaging.broker import create_broker
-from payment_service.messaging.consumer import create_app
+from payment_service.messaging.consumer import create_consumer_app
 from payment_service.messaging.events import PaymentCreatedEvent, payment_created_message
 from payment_service.messaging.retry import ERROR_HEADER, RetryMiddleware
 from payment_service.messaging.topology import (
@@ -27,9 +29,7 @@ from payment_service.models import Payment
 from payment_service.outbox.relay import OutboxRelay
 from payment_service.repositories.outbox import OutboxRepository, outbox_transaction
 from payment_service.repositories.payments import PaymentRepository, payments_transaction
-from payment_service.services.gateway import ChargeResult
 from payment_service.services.processing import PaymentProcessor
-from payment_service.services.webhooks import HttpWebhookNotifier
 from tests.factories import make_payment
 
 pytestmark = pytest.mark.integration
@@ -234,7 +234,7 @@ async def test_consumer_app_handles_a_real_message(
             stored = await session.get(Payment, payment.id)
             return stored is not None and stored.webhook_delivered_at is not None
 
-    async with TestApp(create_app(settings)):
+    async with TestApp(create_consumer_app(settings)):
         await eventually(processed)
 
     assert received

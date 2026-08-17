@@ -4,7 +4,7 @@ from typing import Annotated
 from fastapi import Depends, HTTPException, Security, status
 from fastapi.security import APIKeyHeader
 
-from payment_service.api.deps import SettingsDep
+from payment_service.api.dependencies.settings import SettingsDep
 
 API_KEY_HEADER = "X-API-Key"
 

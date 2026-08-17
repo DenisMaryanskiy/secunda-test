@@ -5,10 +5,10 @@ from typing import Protocol
 
 import structlog
 
+from payment_service.adapters.gateway import ChargeResult, PaymentGateway
+from payment_service.adapters.webhooks import WebhookNotifier
 from payment_service.enums import PaymentStatus
 from payment_service.models import Payment
-from payment_service.services.gateway import ChargeResult, PaymentGateway
-from payment_service.services.webhooks import WebhookNotifier
 
 log = structlog.get_logger(__name__)
 

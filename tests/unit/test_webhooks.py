@@ -7,11 +7,7 @@ from decimal import Decimal
 import httpx
 import pytest
 
-from payment_service.config import WebhookSettings
-from payment_service.enums import PaymentStatus
-from payment_service.errors import UnsafeWebhookUrlError, WebhookDeliveryError
-from payment_service.models.base import utcnow
-from payment_service.services.webhooks import (
+from payment_service.adapters.webhooks import (
     SIGNATURE_HEADER,
     TIMESTAMP_HEADER,
     HttpWebhookNotifier,
@@ -19,6 +15,10 @@ from payment_service.services.webhooks import (
     create_webhook_client,
     sign,
 )
+from payment_service.config import WebhookSettings
+from payment_service.enums import PaymentStatus
+from payment_service.errors import UnsafeWebhookUrlError, WebhookDeliveryError
+from payment_service.models.base import utcnow
 from tests.factories import make_payment
 
 SECRET = "test-signing-secret"

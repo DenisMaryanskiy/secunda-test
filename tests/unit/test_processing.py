@@ -4,10 +4,10 @@ from contextlib import asynccontextmanager
 
 import pytest
 
+from payment_service.adapters.gateway import ChargeResult
 from payment_service.enums import PaymentStatus
 from payment_service.models import Payment
 from payment_service.models.base import utcnow
-from payment_service.services.gateway import ChargeResult
 from payment_service.services.processing import PaymentProcessor, PaymentStore
 from tests.factories import make_payment
 

@@ -3,8 +3,8 @@ import uuid
 
 import pytest
 
+from payment_service.adapters.gateway import FAILURE_REASONS, EmulatedPaymentGateway
 from payment_service.config import GatewaySettings
-from payment_service.services.gateway import FAILURE_REASONS, EmulatedPaymentGateway
 
 
 @pytest.fixture
@@ -52,7 +52,7 @@ async def test_delay_stays_within_configured_bounds(monkeypatch: pytest.MonkeyPa
     async def capture(delay: float) -> None:
         slept.append(delay)
 
-    monkeypatch.setattr("payment_service.services.gateway.asyncio.sleep", capture)
+    monkeypatch.setattr("payment_service.adapters.gateway.asyncio.sleep", capture)
     settings = GatewaySettings(min_delay_seconds=2, max_delay_seconds=5, success_rate=1.0)
     gateway = EmulatedPaymentGateway(settings)
 

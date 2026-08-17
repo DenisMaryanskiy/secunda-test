@@ -1,7 +1,7 @@
 import pytest
 
+from payment_service.adapters.webhook_url import ensure_safe_webhook_target
 from payment_service.errors import UnsafeWebhookUrlError
-from payment_service.webhook_url import ensure_safe_webhook_target
 
 
 @pytest.mark.parametrize(

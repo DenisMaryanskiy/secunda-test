@@ -10,6 +10,7 @@ from payment_service.config import Settings
 from payment_service.db import SessionFactory
 from payment_service.enums import PaymentStatus
 from payment_service.models import OutboxMessage, Payment
+from payment_service.schemas.common import MAX_METADATA_BYTES
 
 pytestmark = pytest.mark.integration
 
@@ -149,6 +150,7 @@ async def test_unknown_payment_is_not_found(client: httpx.AsyncClient) -> None:
         {"description": ""},
         {"webhook_url": "не-ссылка"},
         {"unexpected": "field"},
+        {"metadata": {"blob": "x" * (MAX_METADATA_BYTES + 1)}},
     ],
 )
 async def test_invalid_body_is_rejected(client: httpx.AsyncClient, patch: dict[str, Any]) -> None:
@@ -156,6 +158,23 @@ async def test_invalid_body_is_rejected(client: httpx.AsyncClient, patch: dict[s
 
     assert response.status_code == 422
     assert response.json()["code"] == "validation_error"
+
+
+async def test_validation_error_does_not_echo_the_value(client: httpx.AsyncClient) -> None:
+    """Присланное значение не должно возвращаться клиенту и утекать в логи по пути."""
+    secret_in_body = "4111111111111111"
+
+    response = await client.post(
+        "/api/v1/payments",
+        json=BODY | {"amount": "-1", "metadata": {"card": secret_in_body}},
+        headers=headers(),
+    )
+
+    assert response.status_code == 422
+    assert secret_in_body not in response.text
+    details = response.json()["details"]
+    assert details[0]["loc"] == ["body", "amount"]
+    assert "input" not in details[0]
 
 
 async def test_unexpected_error_does_not_leak_internals(settings: Settings) -> None:

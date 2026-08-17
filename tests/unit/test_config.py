@@ -34,6 +34,12 @@ def test_delay_range_must_be_ordered() -> None:
         GatewaySettings(min_delay_seconds=5, max_delay_seconds=2)
 
 
+def test_docs_are_enabled_only_on_allowed_environments(settings: Settings) -> None:
+    assert settings.environment == "local"
+    assert settings.docs_enabled is True
+    assert settings.model_copy(update={"environment": "production"}).docs_enabled is False
+
+
 def test_insecure_webhooks_are_forbidden_in_production() -> None:
     with pytest.raises(ValidationError, match="production"):
         Settings(

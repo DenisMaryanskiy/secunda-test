@@ -1,11 +1,11 @@
 import uuid
-from typing import Annotated
 
-from fastapi import APIRouter, Header, Response, status
+from fastapi import APIRouter, Response, status
 
-from payment_service.api.deps import PaymentServiceDep
-from payment_service.api.schemas import (
-    ErrorResponse,
+from payment_service.api.dependencies.idempotency import IdempotencyKey
+from payment_service.api.dependencies.services import PaymentServiceDep
+from payment_service.schemas.error import ErrorResponse
+from payment_service.schemas.payment import (
     PaymentAcceptedResponse,
     PaymentCreateRequest,
     PaymentResponse,
@@ -13,16 +13,6 @@ from payment_service.api.schemas import (
 from payment_service.services.commands import NewPayment
 
 router = APIRouter(prefix="/payments", tags=["payments"])
-
-IdempotencyKey = Annotated[
-    str,
-    Header(
-        alias="Idempotency-Key",
-        min_length=1,
-        max_length=255,
-        description="Уникальный ключ запроса. Повтор с тем же ключом не создаёт новый платёж.",
-    ),
-]
 
 
 def _to_command(request: PaymentCreateRequest) -> NewPayment:
